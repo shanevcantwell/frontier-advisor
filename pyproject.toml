@@ -1,0 +1,26 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "frontier-advisor"
+version = "0.1.0"
+description = "MCP server giving local models a governed tool for consulting frontier AI"
+readme = "ARCHITECTURE.md"
+requires-python = ">=3.11"
+dependencies = [
+    "mcp>=1.0.0",
+    "httpx>=0.25.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "pytest-asyncio",
+]
+
+[project.scripts]
+frontier-advisor = "frontier_advisor.server:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/frontier_advisor"]
