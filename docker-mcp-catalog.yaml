@@ -3,7 +3,7 @@ registry:
         command:
             - --transport=stdio
         dateAdded: "2026-03-04T00:00:00Z"
-        description: Gives local models a governed tool for consulting frontier AI (Anthropic, OpenAI) with tiered routing and audit logging.
+        description: Gives local models a tool for consulting frontier AI (Anthropic, OpenAI) with provider fallback.
         image: mcp/frontier-advisor:latest
         metadata:
             category: ai
@@ -29,6 +29,4 @@ registry:
         title: Frontier Advisor
         tools:
             - name: consult_frontier
-            - name: advisory_history
-            - name: describe_advisory_tiers
         type: server

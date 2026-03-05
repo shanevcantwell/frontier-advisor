@@ -1,16 +1,16 @@
 # frontier-advisor-mcp
 
-MCP server that gives local models a tool for consulting frontier AI APIs. The local model decides when to escalate. The scaffold controls access. The server routes, logs, and returns.
+MCP server that gives local models a tool for consulting frontier AI APIs. The local model decides when to escalate. The scaffold controls access. The server routes and returns.
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for design rationale.
 
-## Tools
+## Tool
 
 | Tool | Purpose |
 |---|---|
-| `consult_frontier` | Ask a frontier model a question (quick/standard/deep tiers) |
-| `advisory_history` | Review recent consultations to avoid re-asking |
-| `describe_advisory_tiers` | List available tiers and model preferences |
+| `consult_frontier` | Ask a frontier model a question (Sonnet 4.5 primary, GPT-4.1 fallback) |
+
+Parameters: `question` (required), `context` (optional), `system_prompt` (optional override).
 
 ## Quick Start
 
@@ -70,16 +70,6 @@ pip install -e .
 | `OPENAI_API_KEY` | At least one provider | — |
 | `ANTHROPIC_BASE_URL` | No | `https://api.anthropic.com` |
 | `OPENAI_BASE_URL` | No | `https://api.openai.com` |
-
-## Advisory Tiers
-
-| Tier | Use Case | Max Tokens | Models |
-|---|---|---|---|
-| quick | Factual verification, syntax | 512 | Haiku 4.5, GPT-4.1-mini |
-| standard | Complex reasoning | 2048 | Sonnet 4.5, GPT-4.1 |
-| deep | Architecture, novel synthesis | 4096 | Opus 4.6, o3 |
-
-The local model picks the tier. The server picks the provider (first available in the tier's preference list, with fallback).
 
 ## Development
 

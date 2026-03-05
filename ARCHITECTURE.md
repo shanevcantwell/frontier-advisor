@@ -2,7 +2,7 @@
 
 ## What It Is
 
-An MCP server that gives a local model a **tool for consulting frontier AI**. The local model decides *when* to escalate. The scaffold decides *whether* to allow it. The server routes the request, logs the interaction, and returns the result.
+An MCP server that gives a local model a **tool for consulting frontier AI**. The local model decides *when* to escalate. The scaffold decides *whether* to allow it. The server routes the request and returns the result.
 
 This is the infrastructure for a **90:10 local-to-frontier ratio**.
 
@@ -11,45 +11,42 @@ This is the infrastructure for a **90:10 local-to-frontier ratio**.
 | Approach | What It Does | Gap |
 |---|---|---|
 | **LiteLLM Proxy** | Routes ALL inference through gateway with budget tracking | Not local-first. Proxy for everything, not selective escalation. |
-| **codev consult script** | Thin CLI wrapper, Claude Code calls Gemini | No audit, no governance. Acknowledged as unsafe. |
+| **codev consult script** | Thin CLI wrapper, Claude Code calls Gemini | No governance. Acknowledged as unsafe. |
 | **MCP + Ollama** | Local models using MCP tools for file/search | Tools extend the model -- none consult a smarter model. |
 | **PAL Model Bridge** | MCP server connecting models to each other | No sovereign framing. Context-heavy. |
 
-**The gap**: No MCP tool for advisory consultation with tier routing and audit.
+**The gap**: No MCP tool for stateless advisory consultation with provider fallback.
 
 ## Architecture
 
 ```
 Local Model (qwen3-30b on local HW)
   -> decides it needs help
-  -> MCP tool call: consult_frontier(question, tier, context)
+  -> MCP tool call: consult_frontier(question, context)
   -> frontier-advisor MCP server
-    -> tier routing (quick/standard/deep)
     -> provider fallback (Anthropic -> OpenAI)
-    -> audit log (JSONL record)
   -> Frontier API (system prompt: treat local model as peer)
   -> response + metadata returned to local model
 ```
 
-Access control (how often, how much) is the scaffold's responsibility — not the MCP server's. The server routes and logs.
+Access control (how often, how much) is the scaffold's responsibility — not the MCP server's. The server is stateless: it routes and returns.
 
-## Tools Exposed
+## Tool Exposed
 
 | Tool | Purpose |
 |---|---|
-| consult_frontier | Ask frontier model a question with tier selection |
-| advisory_history | Review recent consultations (avoid re-asking) |
-| describe_advisory_tiers | List tiers and model preferences |
+| consult_frontier | Ask frontier model a question with optional context and system prompt override |
 
-## Advisory Tiers
+## Model Preference
 
-Local model picks the tier, not the provider:
+The server tries providers in order, using the first available:
 
-| Tier | Use Case | Max Tokens | Models |
-|---|---|---|---|
-| quick | Factual verification, syntax | 512 | Haiku 4.5, GPT-4.1-mini |
-| standard | Complex reasoning | 2048 | Sonnet 4.5, GPT-4.1 |
-| deep | Architecture, novel synthesis | 4096 | Opus 4.6, o3 |
+| Priority | Provider | Model |
+|---|---|---|
+| 1 | Anthropic | Claude Sonnet 4.5 |
+| 2 | OpenAI | GPT-4.1 |
+
+No tiers, no budgets. One model preference list, provider fallback. The scaffold controls access policy.
 
 ## Credentials
 
@@ -67,8 +64,6 @@ Designed for [mcp-vault](https://github.com/shanevcantwell/mcp-vault) — env va
 ## Connection to LAS
 
 Natural fit as an MCP tool for GraphOrchestrator. Specialists call consult_frontier directly via MCP (MCP = System Calls in LAS — bypasses Router). The scaffold controls access by deciding whether to expose the tool to a given specialist.
-
-Advisory audit log entries are strings for now — structural compatibility with Archiver routing_history is a future integration point.
 
 ## Dependencies
 

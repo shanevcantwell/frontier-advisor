@@ -172,5 +172,5 @@ case "$choice" in
 esac
 
 echo ""
-echo -e "  ${green}Done.${reset} See README.md for advisory tier details."
+echo -e "  ${green}Done.${reset} See README.md for usage details."
 echo ""

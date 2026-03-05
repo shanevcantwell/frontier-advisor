@@ -18,8 +18,6 @@ import time
 
 import httpx
 
-from frontier_advisor.tiers import ADVISORY_TIERS
-
 logger = logging.getLogger(__name__)
 
 DEFAULT_SYSTEM_PROMPT = (
@@ -30,6 +28,13 @@ DEFAULT_SYSTEM_PROMPT = (
     "Do not repeat the question back. Do not pad with caveats. "
     "The local model is technically competent -- treat it as a peer."
 )
+
+MAX_TOKENS = 4096
+
+MODEL_PREFERENCE = [
+    ("anthropic", "claude-sonnet-4-5-20250929"),
+    ("openai", "gpt-4.1"),
+]
 
 PROVIDER_CONFIG = {
     "anthropic": {
@@ -65,22 +70,19 @@ class FrontierAdapter:
     async def consult(
         self,
         question: str,
-        context: str,
-        tier: str,
+        context: str = "",
         system_prompt: str | None = None,
     ) -> dict:
         """Send question to frontier model with provider fallback.
 
-        Tries each model in the tier's preference list until one succeeds.
+        Tries each model in preference order until one succeeds.
         Returns dict with response, provider, model, token counts, latency.
         Raises RuntimeError if all providers fail.
         """
-        tier_config = ADVISORY_TIERS.get(tier, ADVISORY_TIERS["standard"])
         sys_prompt = system_prompt or DEFAULT_SYSTEM_PROMPT
         last_error = None
 
-        for model_id in tier_config["model_preference"]:
-            provider = "anthropic" if "claude" in model_id else "openai"
+        for provider, model_id in MODEL_PREFERENCE:
             creds = self._get_provider_config(provider)
             if not creds:
                 continue
@@ -88,7 +90,7 @@ class FrontierAdapter:
                 start = time.monotonic()
                 result = await self._call(
                     provider, model_id, question, context,
-                    tier_config["max_tokens"], sys_prompt, creds,
+                    MAX_TOKENS, sys_prompt, creds,
                 )
                 latency = int((time.monotonic() - start) * 1000)
                 return {
@@ -104,7 +106,7 @@ class FrontierAdapter:
                 last_error = e
 
         raise RuntimeError(
-            f"No provider available for tier '{tier}'. Last error: {last_error}"
+            f"No provider available. Last error: {last_error}"
         )
 
     async def _call(self, provider, model, q, ctx, max_tok, sys_prompt, creds):
@@ -150,12 +152,9 @@ class FrontierAdapter:
         msgs = [{"role": "system", "content": sys_prompt}]
         user_content = f"Context:\n{ctx}\n\nQuestion:\n{q}" if ctx else q
         msgs.append({"role": "user", "content": user_content})
-
-        # o3 uses max_completion_tokens, not max_tokens
-        token_key = "max_completion_tokens" if model == "o3" else "max_tokens"
         body = {
             "model": model,
-            token_key: max_tok,
+            "max_tokens": max_tok,
             "messages": msgs,
         }
         resp = await self._client.post(

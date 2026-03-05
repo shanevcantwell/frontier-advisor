@@ -164,5 +164,5 @@ goto done
 
 :done
 echo.
-echo   Done. See README.md for advisory tier details.
+echo   Done. See README.md for usage details.
 echo.
