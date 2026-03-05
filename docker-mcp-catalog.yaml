@@ -28,5 +28,5 @@ registry:
         source: https://github.com/Shane/frontier-advisor-mcp
         title: Frontier Advisor
         tools:
-            - name: consult_frontier
+            - name: consult_advisor
         type: server

@@ -1,5 +1,7 @@
 # frontier-advisor-mcp
 
+<img alt="frontier-advisor-mcp" src="img/frontier-advisor-banner.png" />
+
 MCP server that gives local models a tool for consulting frontier AI APIs. The local model decides when to escalate. The scaffold controls access. The server routes and returns.
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for design rationale.
@@ -8,14 +10,14 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for design rationale.
 
 | Tool | Purpose |
 |---|---|
-| `consult_frontier` | Ask a frontier model a question (Sonnet 4.5 primary, GPT-4.1 fallback) |
+| `consult_advisor` | Ask a frontier model a question (Sonnet 4.5 primary, GPT-4.1 fallback) |
 
 Parameters: `question` (required), `context` (optional), `system_prompt` (optional override).
 
 ## Quick Start
 
 ```bash
-git clone https://github.com/Shane/frontier-advisor-mcp.git
+git clone https://github.com/shanevcantwell/frontier-advisor-mcp.git
 cd frontier-advisor-mcp
 bash install.sh        # Linux / macOS / Git Bash
 install.bat            # Windows (cmd or PowerShell)
@@ -35,7 +37,7 @@ The installer builds the Docker image and walks you through setup:
   Pick an option [1/2/3]:
 ```
 
-**Option 1** uses [mcp-vault](https://github.com/Shane/mcp-vault) to keep API keys in your OS credential store. Your `mcp.json` becomes safe to share, screenshot, or paste in help channels.
+**Option 1** uses [mcp-vault](https://github.com/shanevcantwell/mcp-vault) to keep API keys in your OS credential store. Your `mcp.json` becomes safe to share, screenshot, or paste in help channels.
 
 **Option 2** gets you running fast with env vars in `mcp.json`. Fine for trying it out, but consider option 1 for regular use.
 

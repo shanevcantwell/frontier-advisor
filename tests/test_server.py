@@ -16,7 +16,7 @@ class TestListTools:
     @pytest.mark.asyncio
     async def test_tool_name(self):
         tools = await list_tools()
-        assert tools[0].name == "consult_frontier"
+        assert tools[0].name == "consult_advisor"
 
     @pytest.mark.asyncio
     async def test_required_fields(self):

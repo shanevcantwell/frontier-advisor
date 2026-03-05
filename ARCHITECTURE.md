@@ -22,7 +22,7 @@ This is the infrastructure for a **90:10 local-to-frontier ratio**.
 ```
 Local Model (qwen3-30b on local HW)
   -> decides it needs help
-  -> MCP tool call: consult_frontier(question, context)
+  -> MCP tool call: consult_advisor(question, context)
   -> frontier-advisor MCP server
     -> provider fallback (Anthropic -> OpenAI)
   -> Frontier API (system prompt: treat local model as peer)
@@ -35,7 +35,7 @@ Access control (how often, how much) is the scaffold's responsibility — not th
 
 | Tool | Purpose |
 |---|---|
-| consult_frontier | Ask frontier model a question with optional context and system prompt override |
+| consult_advisor | Ask frontier model a question with optional context and system prompt override |
 
 ## Model Preference
 
@@ -63,7 +63,7 @@ Designed for [mcp-vault](https://github.com/shanevcantwell/mcp-vault) — env va
 
 ## Connection to LAS
 
-Natural fit as an MCP tool for GraphOrchestrator. Specialists call consult_frontier directly via MCP (MCP = System Calls in LAS — bypasses Router). The scaffold controls access by deciding whether to expose the tool to a given specialist.
+Natural fit as an MCP tool for GraphOrchestrator. Specialists call consult_advisor directly via MCP (MCP = System Calls in LAS — bypasses Router). The scaffold controls access by deciding whether to expose the tool to a given specialist.
 
 ## Dependencies
 

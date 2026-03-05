@@ -31,7 +31,7 @@ adapter = FrontierAdapter()
 async def list_tools() -> list[types.Tool]:
     return [
         types.Tool(
-            name="consult_frontier",
+            name="consult_advisor",
             description=(
                 "Consult a frontier AI model for advisory input. "
                 "Use when local capabilities are insufficient — "
@@ -68,7 +68,7 @@ async def list_tools() -> list[types.Tool]:
 
 @server.call_tool()
 async def call_tool(name: str, arguments: dict) -> list[types.TextContent]:
-    if name == "consult_frontier":
+    if name == "consult_advisor":
         return await _handle_consult(arguments)
     return [types.TextContent(
         type="text",
