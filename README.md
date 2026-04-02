@@ -1,6 +1,6 @@
 # frontier-advisor-mcp
 
-<img alt="frontier-advisor-mcp" src="img/frontier-advisor-banner.png" />
+<img width="2752" height="1536" alt="image" src="https://github.com/user-attachments/assets/f86a831c-ba25-4e22-b182-2c7346b7b9be" />
 
 MCP server that gives local models a tool for consulting frontier AI APIs. The local model decides when to escalate. The scaffold controls access. The server routes and returns.
 
