@@ -1,4 +1,4 @@
-# frontier-advisor-mcp
+# frontier-advisor
 
 ## What It Is
 

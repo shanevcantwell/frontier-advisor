@@ -1,4 +1,4 @@
-"""frontier-advisor-mcp: MCP server giving local models a tool
+"""frontier-advisor: MCP server giving local models a tool
 for consulting frontier AI APIs.
 
 The local model decides WHEN to escalate. The scaffold decides

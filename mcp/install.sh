@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # ─────────────────────────────────────────────
-#  frontier-advisor-mcp installer
+#  frontier-advisor installer
 # ─────────────────────────────────────────────
 
 REPO_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -18,7 +18,7 @@ reset="\033[0m"
 banner() {
   echo ""
   echo -e "${bold}  ┌─────────────────────────────────────────┐${reset}"
-  echo -e "${bold}  │       frontier-advisor-mcp  setup        │${reset}"
+  echo -e "${bold}  │       frontier-advisor  setup             │${reset}"
   echo -e "${bold}  └─────────────────────────────────────────┘${reset}"
   echo ""
 }

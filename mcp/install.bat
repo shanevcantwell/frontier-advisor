@@ -2,7 +2,7 @@
 setlocal enabledelayedexpansion
 
 :: ─────────────────────────────────────────────
-::  frontier-advisor-mcp installer (Windows)
+::  frontier-advisor installer (Windows)
 :: ─────────────────────────────────────────────
 
 set "REPO_DIR=%~dp0"
@@ -11,7 +11,7 @@ set "ERROR_LOG=%REPO_DIR%install-error.log"
 
 echo.
 echo   +-------------------------------------------+
-echo   :       frontier-advisor-mcp  setup          :
+echo   :       frontier-advisor  setup             :
 echo   +-------------------------------------------+
 echo.
 echo   1)  Docker + mcp-vault     (OS keychain, recommended)

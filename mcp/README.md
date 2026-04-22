@@ -1,6 +1,4 @@
-# frontier-advisor-mcp
-
-<img width="2752" height="1536" alt="image" src="https://github.com/user-attachments/assets/f86a831c-ba25-4e22-b182-2c7346b7b9be" />
+# frontier-advisor
 
 MCP server that gives local models a tool for consulting frontier AI APIs. The local model decides when to escalate. The scaffold controls access. The server routes and returns.
 
@@ -17,8 +15,8 @@ Parameters: `question` (required), `context` (optional), `system_prompt` (option
 ## Quick Start
 
 ```bash
-git clone https://github.com/shanevcantwell/frontier-advisor-mcp.git
-cd frontier-advisor-mcp
+git clone https://github.com/shanevcantwell/frontier-advisor.git
+cd frontier-advisor/mcp
 bash install.sh        # Linux / macOS / Git Bash
 install.bat            # Windows (cmd or PowerShell)
 ```
@@ -27,7 +25,7 @@ The installer builds the Docker image and walks you through setup:
 
 ```
   ┌─────────────────────────────────────────┐
-  │       frontier-advisor-mcp  setup       │
+  │       frontier-advisor  setup             │
   └─────────────────────────────────────────┘
 
   1)  Docker + mcp-vault     (OS keychain, recommended)

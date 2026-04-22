@@ -25,7 +25,7 @@ registry:
               env: OPENAI_API_KEY
               example: sk-proj-...
               name: frontier-advisor.openai_api_key
-        source: https://github.com/Shane/frontier-advisor-mcp
+        source: https://github.com/shanevcantwell/frontier-advisor
         title: Frontier Advisor
         tools:
             - name: consult_advisor
