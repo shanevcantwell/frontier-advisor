@@ -197,6 +197,7 @@ class TestAdapterOpenAI:
     async def test_openai_success(self, monkeypatch, respx_mock):
         """Test successful OpenAI API call."""
         monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+        monkeypatch.delenv("OPENAI_BASE_URL", raising=False)
         monkeypatch.setenv("OPENAI_API_KEY", "sk-openai-test")
 
         adapter = FrontierAdapter()
@@ -227,6 +228,7 @@ class TestAdapterOpenAI:
         """Test OpenAI API call with context."""
         monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
         monkeypatch.delenv("ANTHROPIC_BASE_URL", raising=False)
+        monkeypatch.delenv("OPENAI_BASE_URL", raising=False)
         monkeypatch.setenv("OPENAI_API_KEY", "sk-openai-test")
 
         adapter = FrontierAdapter()
@@ -289,6 +291,7 @@ class TestAdapterFallback:
     async def test_fallback_anthropic_to_openai(self, monkeypatch, respx_mock):
         """Test fallback from Anthropic to OpenAI when Anthropic fails."""
         monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-anthropic-test")
+        monkeypatch.delenv("OPENAI_BASE_URL", raising=False)
         monkeypatch.setenv("OPENAI_API_KEY", "sk-openai-test")
 
         adapter = FrontierAdapter()
@@ -318,6 +321,7 @@ class TestAdapterFallback:
         """Test that Anthropic is tried first when both are available."""
         monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-anthropic-test")
         monkeypatch.delenv("ANTHROPIC_BASE_URL", raising=False)
+        monkeypatch.delenv("OPENAI_BASE_URL", raising=False)
         monkeypatch.setenv("OPENAI_API_KEY", "sk-openai-test")
 
         adapter = FrontierAdapter()

@@ -1,0 +1,206 @@
+/**
+ * Frontier model adapter — standalone, testable core.
+ *
+ * No pi dependencies. Pure functions using only fetch and process.env.
+ * Used by both the pi extension and any future integrations.
+ */
+
+// ── Configuration ──────────────────────────────────────────────────────────
+
+export const DEFAULT_SYSTEM_PROMPT =
+  "You are being consulted as a frontier advisory model by a local AI system " +
+  "that handles most tasks independently. You are called only when the local " +
+  "model has determined it needs capabilities beyond its own. " +
+  "Be direct, substantive, and efficient with tokens. " +
+  "Do not repeat the question back. Do not pad with caveats. " +
+  "The local model is technically competent -- treat it as a peer.";
+
+export const MAX_TOKENS = 4096;
+
+export const MODEL_PREFERENCE = [
+  ["anthropic", "claude-sonnet-4-5-20250929"] as const,
+  ["openai", "gpt-4.1"] as const,
+] as const;
+
+export type ProviderName = (typeof MODEL_PREFERENCE)[number][0];
+
+export const PROVIDER_CONFIG: Record<ProviderName, {
+  envKey: string;
+  envBaseUrl: string;
+  defaultBaseUrl: string;
+}> = {
+  anthropic: {
+    envKey: "ANTHROPIC_API_KEY",
+    envBaseUrl: "ANTHROPIC_BASE_URL",
+    defaultBaseUrl: "https://api.anthropic.com",
+  },
+  openai: {
+    envKey: "OPENAI_API_KEY",
+    envBaseUrl: "OPENAI_BASE_URL",
+    defaultBaseUrl: "https://api.openai.com",
+  },
+};
+
+// ── Credential resolution ─────────────────────────────────────────────────
+
+export function getProviderCredentials(provider: ProviderName): { apiKey: string; baseUrl: string } | undefined {
+  const cfg = PROVIDER_CONFIG[provider];
+  const apiKey = process.env[cfg.envKey];
+  if (!apiKey) return undefined;
+  return {
+    apiKey,
+    baseUrl: process.env[cfg.envBaseUrl] ?? cfg.defaultBaseUrl,
+  };
+}
+
+// ── HTTP clients ───────────────────────────────────────────────────────────
+
+export interface ConsultResult {
+  text: string;
+  inputTokens: number;
+  outputTokens: number;
+}
+
+export async function callAnthropic(
+  model: string,
+  question: string,
+  context: string,
+  maxTokens: number,
+  systemPrompt: string,
+  creds: { apiKey: string; baseUrl: string },
+): Promise<ConsultResult> {
+  const headers: Record<string, string> = {
+    "x-api-key": creds.apiKey,
+    "anthropic-version": "2023-06-01",
+    "content-type": "application/json",
+  };
+
+  const userContent = context
+    ? `<advisory_context>\n${context}\n</advisory_context>\n\n<advisory_question>\n${question}\n</advisory_question>`
+    : question;
+
+  const body = JSON.stringify({
+    model,
+    max_tokens: maxTokens,
+    system: systemPrompt,
+    messages: [{ role: "user", content: userContent }],
+  });
+
+  const resp = await fetch(`${creds.baseUrl}/v1/messages`, {
+    method: "POST",
+    headers,
+    body,
+  });
+
+  if (!resp.ok) {
+    const bodyText = await resp.text();
+    throw new Error(`Anthropic ${resp.status}: ${bodyText}`);
+  }
+
+  const data = await resp.json() as {
+    content: Array<{ type: string; text?: string }>;
+    usage: { input_tokens: number; output_tokens: number };
+  };
+
+  const text = data.content.filter((b) => b.type === "text").map((b) => b.text ?? "").join("");
+
+  return {
+    text,
+    inputTokens: data.usage.input_tokens,
+    outputTokens: data.usage.output_tokens,
+  };
+}
+
+export async function callOpenAI(
+  model: string,
+  question: string,
+  context: string,
+  maxTokens: number,
+  systemPrompt: string,
+  creds: { apiKey: string; baseUrl: string },
+): Promise<ConsultResult> {
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${creds.apiKey}`,
+    "Content-Type": "application/json",
+  };
+
+  const msgs = [{ role: "system" as const, content: systemPrompt }];
+  const userContent = context ? `Context:\n${context}\n\nQuestion:\n${question}` : question;
+  msgs.push({ role: "user" as const, content: userContent });
+
+  const body = JSON.stringify({ model, max_tokens: maxTokens, messages: msgs });
+
+  const resp = await fetch(`${creds.baseUrl}/v1/chat/completions`, {
+    method: "POST",
+    headers,
+    body,
+  });
+
+  if (!resp.ok) {
+    const bodyText = await resp.text();
+    throw new Error(`OpenAI ${resp.status}: ${bodyText}`);
+  }
+
+  const data = await resp.json() as {
+    choices: Array<{ message: { content: string } }>;
+    usage: { prompt_tokens: number; completion_tokens: number };
+  };
+
+  return {
+    text: data.choices[0]?.message.content ?? "",
+    inputTokens: data.usage.prompt_tokens,
+    outputTokens: data.usage.completion_tokens,
+  };
+}
+
+// ── Consult core logic ─────────────────────────────────────────────────────
+
+export interface ConsultOptions {
+  question: string;
+  context?: string;
+  systemPrompt?: string;
+  signal?: AbortSignal;
+}
+
+export interface ConsultResponse {
+  response: string;
+  provider: string;
+  model: string;
+  inputTokens: number;
+  outputTokens: number;
+  latencyMs: number;
+}
+
+export async function consult({ question, context = "", systemPrompt }: ConsultOptions): Promise<ConsultResponse> {
+  const sysPrompt = systemPrompt ?? DEFAULT_SYSTEM_PROMPT;
+  let lastError: unknown;
+
+  const start = performance.now();
+
+  for (const [provider, modelId] of MODEL_PREFERENCE) {
+    const creds = getProviderCredentials(provider as ProviderName);
+    if (!creds) continue;
+
+    try {
+      const result = await (provider === "anthropic"
+        ? callAnthropic(modelId, question, context, MAX_TOKENS, sysPrompt, creds)
+        : callOpenAI(modelId, question, context, MAX_TOKENS, sysPrompt, creds));
+
+      const latencyMs = Math.round(performance.now() - start);
+
+      return {
+        response: result.text,
+        provider,
+        model: modelId,
+        inputTokens: result.inputTokens,
+        outputTokens: result.outputTokens,
+        latencyMs,
+      };
+    } catch (e) {
+      console.error(`[frontier-advisor] Provider ${provider}/${modelId} failed:`, e);
+      lastError = e;
+    }
+  }
+
+  throw new Error(`No provider available. Last error: ${lastError}`);
+}
