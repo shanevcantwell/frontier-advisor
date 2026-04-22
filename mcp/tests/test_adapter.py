@@ -107,7 +107,7 @@ class TestAdapterAnthropic:
 
         assert result["response"] == "This is the advisory response."
         assert result["provider"] == "anthropic"
-        assert result["model"] == "claude-sonnet-4-5-20250929"
+        assert result["model"] == "claude-opus-4-7-20250908"
         assert result["input_tokens"] == 10
         assert result["output_tokens"] == 8
         assert "latency_ms" in result
