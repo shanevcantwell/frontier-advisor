@@ -32,7 +32,7 @@ DEFAULT_SYSTEM_PROMPT = (
 MAX_TOKENS = 4096
 
 MODEL_PREFERENCE = [
-    ("anthropic", "claude-sonnet-4-5-20250929"),
+    ("anthropic", "claude-opus-4-7-20250908"),
     ("openai", "gpt-4.1"),
 ]
 

@@ -43,7 +43,7 @@ The server tries providers in order, using the first available:
 
 | Priority | Provider | Model |
 |---|---|---|
-| 1 | Anthropic | Claude Sonnet 4.5 |
+| 1 | Anthropic | Claude Opus 4.7 |
 | 2 | OpenAI | GPT-4.1 |
 
 No tiers, no budgets. One model preference list, provider fallback. The scaffold controls access policy.

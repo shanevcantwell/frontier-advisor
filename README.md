@@ -27,7 +27,7 @@ Then run `pi` — the tool appears automatically. No configuration needed beyond
 ```
 LLM calls consult_advisor(question, context?)
   → pi extension runs adapter.ts
-  → tries Anthropic Sonnet 4.5 first
+  → tries Anthropic Opus 4.7 first
   → falls back to OpenAI GPT-4.1
   → returns response + metadata (provider, model, tokens, latency)
 ```
@@ -62,7 +62,7 @@ bash install.sh
 ```
 LLM calls consult_advisor(question, context?)
   → MCP stdio transport
-  → tries Anthropic Sonnet 4.5 first
+  → tries Anthropic Opus 4.7 first
   → falls back to OpenAI GPT-4.1
   → JSON-RPC result returned to LLM
 ```
@@ -75,7 +75,7 @@ See [mcp/README.md](mcp/README.md) for Docker, mcp-vault, and Toolkit installati
 
 | Tool | Purpose |
 |---|---|
-| `consult_advisor` | Ask a frontier model a question (Sonnet 4.5 primary, GPT-4.1 fallback) |
+| `consult_advisor` | Ask a frontier model a question (Opus 4.7 primary, GPT-4.1 fallback) |
 
 Parameters: `question` (required), `context` (optional), `system_prompt` (optional override).
 

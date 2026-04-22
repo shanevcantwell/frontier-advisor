@@ -8,7 +8,7 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for design rationale.
 
 | Tool | Purpose |
 |---|---|
-| `consult_advisor` | Ask a frontier model a question (Sonnet 4.5 primary, GPT-4.1 fallback) |
+| `consult_advisor` | Ask a frontier model a question (Opus 4.7 primary, GPT-4.1 fallback) |
 
 Parameters: `question` (required), `context` (optional), `system_prompt` (optional override).
 
