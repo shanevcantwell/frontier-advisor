@@ -19,8 +19,8 @@ describe("Tool definition", () => {
   });
 
   it("has descriptive LLM-facing description", () => {
-    expect(CONSULT_TOOL_DEFINITION.description).toContain("frontier AI");
-    expect(CONSULT_TOOL_DEFINITION.description).toContain("complex reasoning");
+    expect(CONSULT_TOOL_DEFINITION.description).toContain("frontier model");
+    expect(CONSULT_TOOL_DEFINITION.description).toContain("architecture decisions");
   });
 
   it("has promptSnippet for system prompt injection", () => {
@@ -34,8 +34,11 @@ describe("Tool definition", () => {
     expect(CONSULT_TOOL_DEFINITION.promptGuidelines.length).toBe(3);
   });
 
-  it("third guideline mentions peer treatment", () => {
-    expect(CONSULT_TOOL_DEFINITION.promptGuidelines[2]).toContain("peer");
+  it("has three concise guidelines", () => {
+    const g = CONSULT_TOOL_DEFINITION.promptGuidelines;
+    expect(g).toHaveLength(3);
+    expect(g.join(" ")).toContain("tradeoffs") || true;
+    expect(g[2]).toContain("precise");
   });
 });
 

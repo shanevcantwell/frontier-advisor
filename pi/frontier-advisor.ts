@@ -219,12 +219,10 @@ async function consult(question: string, context: string, systemPrompt: string |
     }
   }
 
-    if (lastError) {
-    throw new Error(`All configured providers failed. Last error: ${lastError}`);
-  }
-  throw new Error(
-    "No API key configured for any provider. Set ANTHROPIC_API_KEY and/or OPENAI_API_KEY in the environment.",
-  );
+  // All attempts exhausted — report the last error
+  const errorMsg = lastError instanceof Error ? lastError.message : String(lastError);
+  throw new Error(`All configured providers failed. Last error: ${errorMsg}`);
+}
 
 // ── Tool definition ──────────────────────────────────────────────────────────
 

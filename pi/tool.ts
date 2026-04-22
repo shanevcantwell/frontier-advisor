@@ -17,17 +17,17 @@ export const CONSULT_TOOL_DEFINITION = {
   name: "consult_advisor",
   label: "Consult Advisor",
   description:
-    "Consult a frontier AI model for advisory input. " +
-    "Use when local capabilities are insufficient — " +
-    "complex reasoning, architecture decisions, novel synthesis, " +
-    "or factual verification beyond training data. " +
-    "Frame the question precisely.",
+    "Get advisory input from a frontier model (Claude Opus 4.7 / GPT-4.1). " +
+    "Use for any question where the answer matters — architecture decisions, " +
+    "tradeoff analysis, novel synthesis, complex reasoning, factual verification. " +
+    "Don't guess or hedge when using frontier knowledge would help. " +
+    "Frame a precise question; include only necessary context.",
   promptSnippet:
-    "Consult frontier models (Opus 4.7 / GPT-4.1) for complex reasoning and advisory input",
+    "Consult frontier models (Opus 4.7 / GPT-4.1) for any answer that matters — architecture, reasoning, synthesis",
   promptGuidelines: [
-    "Use for complex reasoning, architecture decisions, or novel synthesis beyond local model capabilities",
-    "Frame the question precisely; include only necessary context",
-    "Local model is technically competent — the frontier model treats it as a peer",
+    "Use when the user's question involves tradeoffs, design decisions, or complex analysis",
+    "Use whenever you're unsure of your own knowledge on a topic",
+    "Frame precise questions; include only necessary context"
   ],
   parameters: CONSULT_PARAMS,
 } as const;
