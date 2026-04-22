@@ -11,6 +11,7 @@
     "vitest": "^4.1.5"
   },
   "dependencies": {
-    "@sinclair/typebox": "^0.34.49"
+    "@sinclair/typebox": "^0.34.49",
+    "undici": "^7.0.0"
   }
 }

@@ -7,6 +7,8 @@
 
 // ── Configuration ──────────────────────────────────────────────────────────
 
+import { ProxyAgent } from "undici";
+
 export const DEFAULT_SYSTEM_PROMPT =
   "You are being consulted as a frontier advisory model by a local AI system " +
   "that handles most tasks independently. You are called only when the local " +
@@ -72,6 +74,34 @@ export async function getProviderCredentialsAsync(provider: ProviderName, resolv
   return resolve(provider);
 }
 
+// ── Proxy support for fetch ────────────────────────────────────────────────
+
+let _proxyDispatcher: ReturnType<typeof ProxyAgent> | undefined;
+
+function getDispatcher(): typeof fetch | undefined {
+  // Respect proxy env vars (http_proxy, https_proxy, HTTPS_PROXY, HTTP_PROXY)
+  // Undici's fetch in Docker doesn't auto-respect these, so we wire it explicitly.
+  const proxyUrl =
+    process.env.https_proxy ||
+    process.env.HTTPS_PROXY ||
+    process.env.http_proxy ||
+    process.env.HTTP_PROXY;
+
+  if (!proxyUrl) return undefined;
+
+  // Avoid creating a new dispatcher on every call — cache it
+  if (!_proxyDispatcher) {
+    try {
+      _proxyDispatcher = new ProxyAgent({ uri: proxyUrl });
+    } catch {
+      // ProxyAgent construction can fail in some environments; fall through to plain fetch
+      _proxyDispatcher = undefined;
+    }
+  }
+
+  return _proxyDispatcher;
+}
+
 // ── HTTP clients ───────────────────────────────────────────────────────────
 
 export interface ConsultResult {
@@ -105,10 +135,12 @@ export async function callAnthropic(
     messages: [{ role: "user", content: userContent }],
   });
 
+  const dispatcher = getDispatcher();
   const resp = await fetch(`${creds.baseUrl}/v1/messages`, {
     method: "POST",
     headers,
     body,
+    dispatcher,
   });
 
   if (!resp.ok) {
@@ -149,10 +181,12 @@ export async function callOpenAI(
 
   const body = JSON.stringify({ model, max_tokens: maxTokens, messages: msgs });
 
+  const dispatcher = getDispatcher();
   const resp = await fetch(`${creds.baseUrl}/v1/chat/completions`, {
     method: "POST",
     headers,
     body,
+    dispatcher,
   });
 
   if (!resp.ok) {

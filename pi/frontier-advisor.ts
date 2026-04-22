@@ -62,6 +62,25 @@ async function getProviderCredentials(provider: ProviderName, resolver?: ApiKeyR
   return resolve(provider);
 }
 
+// ── Proxy support ──────────────────────────────────────────────────────────
+
+let _proxyDispatcher: any | undefined;
+
+async function getDispatcher(): Promise<any> {
+  const proxyUrl = process.env.https_proxy || process.env.HTTPS_PROXY || process.env.http_proxy || process.env.HTTP_PROXY;
+  if (!proxyUrl) return undefined;
+  if (!_proxyDispatcher) {
+    try {
+      const { ProxyAgent } = await import("undici");
+      _proxyDispatcher = new ProxyAgent({ uri: proxyUrl });
+    } catch {
+      // ProxyAgent may not be available in all environments
+      _proxyDispatcher = undefined;
+    }
+  }
+  return _proxyDispatcher;
+}
+
 // ── HTTP clients ─────────────────────────────────────────────────────────────
 
 async function callAnthropic(
@@ -89,10 +108,12 @@ async function callAnthropic(
     messages: [{ role: "user", content: userContent }],
   });
 
+  const dispatcher = await getDispatcher();
   const resp = await fetch(`${creds.baseUrl}/v1/messages`, {
     method: "POST",
     headers,
     body,
+    dispatcher,
   });
 
   if (!resp.ok) {
@@ -133,10 +154,12 @@ async function callOpenAI(
 
   const body = JSON.stringify({ model, max_tokens: maxTokens, messages: msgs });
 
+  const dispatcher = await getDispatcher();
   const resp = await fetch(`${creds.baseUrl}/v1/chat/completions`, {
     method: "POST",
     headers,
     body,
+    dispatcher,
   });
 
   if (!resp.ok) {
