@@ -43,14 +43,33 @@ export const PROVIDER_CONFIG: Record<ProviderName, {
 
 // ── Credential resolution ─────────────────────────────────────────────────
 
-export function getProviderCredentials(provider: ProviderName): { apiKey: string; baseUrl: string } | undefined {
-  const cfg = PROVIDER_CONFIG[provider];
-  const apiKey = process.env[cfg.envKey];
-  if (!apiKey) return undefined;
-  return {
-    apiKey,
-    baseUrl: process.env[cfg.envBaseUrl] ?? cfg.defaultBaseUrl,
+export type ApiKeyResolver = (provider: ProviderName) => { apiKey: string; baseUrl: string } | undefined | Promise<{ apiKey: string; baseUrl: string } | undefined>;
+
+export function envKeyResolver(): ApiKeyResolver {
+  return (provider: ProviderName) => {
+    const cfg = PROVIDER_CONFIG[provider];
+    const apiKey = process.env[cfg.envKey];
+    if (!apiKey) return undefined;
+    return {
+      apiKey,
+      baseUrl: process.env[cfg.envBaseUrl] ?? cfg.defaultBaseUrl,
+    };
   };
+}
+
+function isPromise<T>(value: T | Promise<T>): value is Promise<T> {
+  return typeof (value as Promise<T>)?.then === "function";
+}
+
+export function getProviderCredentials(provider: ProviderName, resolver?: ApiKeyResolver): { apiKey: string; baseUrl: string } | undefined {
+  const resolve = resolver ?? envKeyResolver();
+  const result = resolve(provider);
+  return isPromise(result) ? undefined : result;
+}
+
+export async function getProviderCredentialsAsync(provider: ProviderName, resolver?: ApiKeyResolver): Promise<{ apiKey: string; baseUrl: string } | undefined> {
+  const resolve = resolver ?? envKeyResolver();
+  return resolve(provider);
 }
 
 // ── HTTP clients ───────────────────────────────────────────────────────────
@@ -160,6 +179,8 @@ export interface ConsultOptions {
   context?: string;
   systemPrompt?: string;
   signal?: AbortSignal;
+  /** Custom key resolver (e.g. from pi's AuthStorage). Defaults to process.env. */
+  apiKeyResolver?: ApiKeyResolver;
 }
 
 export interface ConsultResponse {
@@ -171,14 +192,14 @@ export interface ConsultResponse {
   latencyMs: number;
 }
 
-export async function consult({ question, context = "", systemPrompt }: ConsultOptions): Promise<ConsultResponse> {
+export async function consult({ question, context = "", systemPrompt, apiKeyResolver }: ConsultOptions): Promise<ConsultResponse> {
   const sysPrompt = systemPrompt ?? DEFAULT_SYSTEM_PROMPT;
   let lastError: unknown;
 
   const start = performance.now();
 
   for (const [provider, modelId] of MODEL_PREFERENCE) {
-    const creds = getProviderCredentials(provider as ProviderName);
+    const creds = await getProviderCredentialsAsync(provider as ProviderName, apiKeyResolver);
     if (!creds) continue;
 
     try {

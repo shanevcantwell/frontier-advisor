@@ -11,6 +11,9 @@ import {
   callAnthropic,
   callOpenAI,
   getProviderCredentials,
+  getProviderCredentialsAsync,
+  envKeyResolver,
+  ApiKeyResolver,
   DEFAULT_SYSTEM_PROMPT,
   MAX_TOKENS,
   MODEL_PREFERENCE,
@@ -73,9 +76,8 @@ describe("Configuration", () => {
 
 // ── Credential resolution ──────────────────────────────────────────────────
 
-describe("getProviderCredentials", () => {
+describe("envKeyResolver", () => {
   beforeEach(() => {
-    // Clean environment before each test
     delete process.env.ANTHROPIC_API_KEY;
     delete process.env.OPENAI_API_KEY;
     delete process.env.ANTHROPIC_BASE_URL;
@@ -83,12 +85,14 @@ describe("getProviderCredentials", () => {
   });
 
   it("returns undefined when key is missing", () => {
-    expect(getProviderCredentials("anthropic")).toBeUndefined();
+    const resolver = envKeyResolver();
+    expect(resolver("anthropic")).toBeUndefined();
   });
 
   it("returns creds when key is present", () => {
     process.env.ANTHROPIC_API_KEY = "sk-test";
-    const result = getProviderCredentials("anthropic");
+    const resolver = envKeyResolver();
+    const result = resolver("anthropic");
     expect(result).toBeDefined();
     expect(result?.apiKey).toBe("sk-test");
   });
@@ -96,13 +100,15 @@ describe("getProviderCredentials", () => {
   it("uses custom base URL when set", () => {
     process.env.OPENAI_API_KEY = "sk-test";
     process.env.OPENAI_BASE_URL = "http://localhost:8080";
-    const result = getProviderCredentials("openai");
+    const resolver = envKeyResolver();
+    const result = resolver("openai");
     expect(result?.baseUrl).toBe("http://localhost:8080");
   });
 
   it("uses default base URL when not overridden", () => {
     process.env.ANTHROPIC_API_KEY = "sk-test";
-    const result = getProviderCredentials("anthropic");
+    const resolver = envKeyResolver();
+    const result = resolver("anthropic");
     expect(result?.baseUrl).toBe("https://api.anthropic.com");
   });
 
@@ -110,11 +116,47 @@ describe("getProviderCredentials", () => {
     process.env.ANTHROPIC_API_KEY = "sk-ant-test";
     process.env.OPENAI_API_KEY = "sk-oai-test";
 
-    const ant = getProviderCredentials("anthropic");
-    const oai = getProviderCredentials("openai");
+    const resolver = envKeyResolver();
+    const ant = resolver("anthropic");
+    const oai = resolver("openai");
 
     expect(ant?.apiKey).toBe("sk-ant-test");
     expect(oai?.apiKey).toBe("sk-oai-test");
+  });
+});
+
+describe("getProviderCredentials", () => {
+  beforeEach(() => {
+    delete process.env.ANTHROPIC_API_KEY;
+    delete process.env.OPENAI_API_KEY;
+    delete process.env.ANTHROPIC_BASE_URL;
+    delete process.env.OPENAI_BASE_URL;
+  });
+
+  it("uses envKeyResolver by default", () => {
+    process.env.ANTHROPIC_API_KEY = "sk-test";
+    const result = getProviderCredentials("anthropic");
+    expect(result?.apiKey).toBe("sk-test");
+  });
+
+  it("uses custom resolver when provided", () => {
+    const mockResolver: ApiKeyResolver = (provider) => {
+      if (provider === "anthropic") return { apiKey: "mocked-key", baseUrl: "https://mock.api" };
+      return undefined;
+    };
+    const result = getProviderCredentials("anthropic", mockResolver);
+    expect(result?.apiKey).toBe("mocked-key");
+    expect(result?.baseUrl).toBe("https://mock.api");
+  });
+
+  it("async resolver works with getProviderCredentialsAsync", async () => {
+    const mockResolver: ApiKeyResolver = async (provider) => {
+      if (provider === "anthropic") return { apiKey: "async-key", baseUrl: "https://async.api" };
+      return undefined;
+    };
+    const result = await getProviderCredentialsAsync("anthropic", mockResolver);
+    expect(result?.apiKey).toBe("async-key");
+    expect(result?.baseUrl).toBe("https://async.api");
   });
 });
 
