@@ -61,7 +61,7 @@
 - `TestAdapterAnthropic.test_anthropic_with_context` - Context injected via XML tags
 - `TestAdapterOpenAI.test_openai_success` - OpenAI API success with response parsing
 - `TestAdapterOpenAI.test_openai_with_context` - Context injected in user message
-- `TestAdapterOpenAI.test_openai_custom_base_url` - Custom ANTHROPIC_BASE_URL handling
+- `TestAdapterOpenAI.test_openai_custom_base_url` - Custom OPENAI_BASE_URL handling
 
 **Approach**: Used `pytest-respx` for HTTP mocking with `route.side_effect` pattern to capture request bodies
 
@@ -108,7 +108,7 @@
 
 3. **HTTP mocking library**: Used `pytest-respx` (already available) with the `route.side_effect = callback` pattern for capturing request bodies
 
-4. **Environment isolation**: Used `monkeypatch.delenv("ANTHROPIC_BASE_URL", raising=False)` in tests expecting default URLs
+4. **Environment isolation**: Used `monkeypatch.delenv("OPENAI_BASE_URL", raising=False)` in tests expecting default URLs
 
 ## Test Patterns Established
 

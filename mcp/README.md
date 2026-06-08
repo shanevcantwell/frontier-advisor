@@ -1,6 +1,9 @@
 # frontier-advisor
 
-MCP server that gives local models a tool for consulting frontier AI APIs. The local model decides when to escalate. The scaffold controls access. The server routes and returns.
+MCP server that gives local models a tool for consulting frontier AI — the
+intelligence-ceiling **escalation primitive** (`consult_advisor()`) of the agent system.
+The local model decides when to escalate. The scaffold controls access. The server routes
+and returns.
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for design rationale.
 
@@ -33,29 +36,52 @@ bash install.sh        # Linux / macOS / Git Bash
 install.bat            # Windows (cmd or PowerShell)
 ```
 
-The installer builds the Docker image and walks you through setup:
+The installer builds the Docker image (bundling the `claude` CLI), checks your OAuth
+credentials, and walks you through setup:
 
 ```
   ┌─────────────────────────────────────────┐
   │       frontier-advisor  setup             │
   └─────────────────────────────────────────┘
 
-  1)  Docker + mcp-vault     (OS keychain, recommended)
-  2)  Docker + env vars      (quick start)
-  3)  Docker MCP Toolkit     (gateway + mcp.json)
+  1)  Docker                 (claude CLI / OAuth, recommended)
+  2)  Docker MCP Toolkit     (gateway + mcp.json)
 
-  Pick an option [1/2/3]:
+  Pick an option [1/2]:
 ```
 
-**Option 1** uses [mcp-vault](https://github.com/shanevcantwell/mcp-vault) to keep API keys in your OS credential store. Your `mcp.json` becomes safe to share, screenshot, or paste in help channels.
+**Option 1** runs the server as a plain `docker run` and prints the `mcp.json` snippet. The
+top tier needs no API key — it uses the `claude` CLI authenticated via OAuth, supplied to
+the container through a read-only mount of `~/.claude` (see below).
 
-**Option 2** gets you running fast with env vars in `mcp.json`. Fine for trying it out, but consider option 1 for regular use.
+**Option 2** also registers the server in Docker Desktop's MCP gateway for tool routing via
+`docker mcp client connect`.
 
-**Option 3** registers the server in Docker Desktop's MCP gateway for tool routing via `docker mcp client connect`. API keys still go in `mcp.json` — custom catalog servers don't yet appear in the Desktop UI secrets panel.
+Both options offer to enable the **optional** OpenAI fallback (`OPENAI_API_KEY`).
 
 See [mcp.json.example](mcp.json.example) for the recommended client configuration.
 
+### Credentials mount (top tier)
+
+No API key or OAuth credential is ever baked into the image. The `claude` CLI inside the
+container reads OAuth creds from `$HOME/.claude/.credentials.json`; the host's `~/.claude`
+is mounted **read-only** at runtime:
+
+```bash
+docker run -i --rm \
+  -v "$HOME/.claude:/home/advisor/.claude:ro" \
+  mcp/frontier-advisor
+```
+
+Prerequisite: authenticate the `claude` CLI once on the host (run `claude` and sign in via
+OAuth) so `~/.claude/.credentials.json` exists. To also enable the OpenAI fallback, add
+`-e OPENAI_API_KEY=...` (or a `vault:openai/api-key` reference via
+[mcp-vault](https://github.com/shanevcantwell/mcp-vault)).
+
 ### Manual install (no Docker)
+
+Requires the `claude` CLI on PATH (npm `@anthropic-ai/claude-code`), authenticated via
+OAuth, for the top tier.
 
 ```bash
 pip install -e .
@@ -86,7 +112,11 @@ interactively to sign in). No API key is needed for the top tier.
 
 ## Development
 
+Use a project virtualenv for host-side dev/tests — the non-brittle alternative to
+`pip install --break-system-packages`, which mutates the system interpreter:
+
 ```bash
+python -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
 pytest
 ```

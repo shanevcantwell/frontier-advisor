@@ -8,21 +8,20 @@ setlocal enabledelayedexpansion
 set "REPO_DIR=%~dp0"
 set "IMAGE_NAME=mcp/frontier-advisor"
 set "ERROR_LOG=%REPO_DIR%install-error.log"
+set "OPENAI_LINE="
 
 echo.
 echo   +-------------------------------------------+
 echo   :       frontier-advisor  setup             :
 echo   +-------------------------------------------+
 echo.
-echo   1)  Docker + mcp-vault     (OS keychain, recommended)
-echo   2)  Docker + env vars      (quick start)
-echo   3)  Docker MCP Toolkit     (gateway + mcp.json)
+echo   1)  Docker                 (claude CLI / OAuth, recommended)
+echo   2)  Docker MCP Toolkit     (gateway + mcp.json)
 echo.
-set /p "CHOICE=  Pick an option [1/2/3]: "
+set /p "CHOICE=  Pick an option [1/2]: "
 
-if "%CHOICE%"=="1" goto vault
-if "%CHOICE%"=="2" goto envvars
-if "%CHOICE%"=="3" goto toolkit
+if "%CHOICE%"=="1" goto dockerrun
+if "%CHOICE%"=="2" goto toolkit
 echo.
 echo   ! Invalid choice. Run this script again.
 exit /b 1
@@ -31,7 +30,7 @@ exit /b 1
 
 :build
 echo.
-echo   Building Docker image...
+echo   Building Docker image (bundles the claude CLI)...
 docker build -t %IMAGE_NAME% "%REPO_DIR%." --quiet >nul 2>>"%ERROR_LOG%"
 if errorlevel 1 (
     echo   X Docker build failed. See install-error.log for details.
@@ -41,68 +40,41 @@ if errorlevel 1 (
 echo   * Image built: %IMAGE_NAME%
 exit /b 0
 
-:: ── Option 1: Docker + mcp-vault ─────────────
+:: ── Shared: claude CLI OAuth prerequisite ────
 
-:vault
-call :build
-if errorlevel 1 exit /b 1
-
+:check_claude_auth
 echo.
-where mcp-vault >nul 2>&1
-if errorlevel 1 (
-    echo   ! mcp-vault not found on PATH.
-    echo     Install it from: https://github.com/Shane/mcp-vault
-    echo.
-)
-
-echo   Store your API keys (at least one):
+echo   Top tier: local claude CLI (Opus via OAuth / flat-rate Claude Max)
 echo.
-
-set /p "ANTHROPIC_KEY=  Anthropic API key (Enter to skip): "
-if defined ANTHROPIC_KEY (
-    echo !ANTHROPIC_KEY! | mcp-vault store anthropic/api-key >nul 2>>"%ERROR_LOG%"
-    if errorlevel 1 (
-        echo   ! Could not store. Run: mcp-vault store anthropic/api-key
-    ) else (
-        echo   * Stored anthropic/api-key
-    )
+if exist "%USERPROFILE%\.claude\.credentials.json" (
+    echo   * Found OAuth credentials at %%USERPROFILE%%\.claude\.credentials.json
+) else (
+    echo   ! No %%USERPROFILE%%\.claude\.credentials.json found.
+    echo     Authenticate the CLI once on the host, then re-run if needed:
+    echo       claude        ^(sign in via OAuth, then exit^)
+    echo     The container mounts ~/.claude read-only -- no API key is baked or needed.
 )
+exit /b 0
 
-set /p "OPENAI_KEY=  OpenAI API key (Enter to skip): "
+:: ── Shared: optional OpenAI fallback ─────────
+
+:prompt_openai
+echo.
+echo   Optional: OpenAI fallback tier (GPT-4.1)
+echo   Used only when the claude CLI tier is unavailable. Press Enter to skip.
+set /p "OPENAI_KEY=  OPENAI_API_KEY (Enter to skip): "
 if defined OPENAI_KEY (
-    echo !OPENAI_KEY! | mcp-vault store openai/api-key >nul 2>>"%ERROR_LOG%"
-    if errorlevel 1 (
-        echo   ! Could not store. Run: mcp-vault store openai/api-key
-    ) else (
-        echo   * Stored openai/api-key
-    )
+    set "OPENAI_LINE=        "-e", "OPENAI_API_KEY=!OPENAI_KEY!","
+    echo   * OpenAI fallback enabled ^(key will be inlined in the snippet below^)
+    echo     Prefer not to inline it? Use mcp-vault: "OPENAI_API_KEY=vault:openai/api-key".
+) else (
+    echo   Skipped -- top tier ^(claude CLI^) only.
 )
+exit /b 0
 
-echo.
-echo   Add this to your MCP client config (mcp.json):
-echo.
-echo     "frontier-advisor": {
-echo       "command": "mcp-vault",
-echo       "args": [
-echo         "--", "docker", "run", "-i", "--rm",
-echo         "-e", "ANTHROPIC_API_KEY=vault:anthropic/api-key",
-echo         "-e", "OPENAI_API_KEY=vault:openai/api-key",
-echo         "mcp/frontier-advisor"
-echo       ]
-echo     }
-echo.
-echo   (also saved in mcp.json.example)
-goto done
+:: ── Shared: config snippet ───────────────────
 
-:: ── Option 2: Docker + env vars ──────────────
-
-:envvars
-call :build
-if errorlevel 1 exit /b 1
-
-echo.
-echo   ! Keys in mcp.json are easily leaked when sharing config.
-echo     Consider mcp-vault (option 1) to keep them in your OS keychain.
+:print_snippet
 echo.
 echo   Add this to your MCP client config (mcp.json):
 echo.
@@ -110,17 +82,34 @@ echo     "frontier-advisor": {
 echo       "command": "docker",
 echo       "args": [
 echo         "run", "-i", "--rm",
-echo         "-e", "ANTHROPIC_API_KEY=^<your-key-here^>",
+echo         "-v", "${HOME}/.claude:/home/advisor/.claude:ro",
+if defined OPENAI_LINE echo !OPENAI_LINE!
 echo         "mcp/frontier-advisor"
 echo       ]
 echo     }
+echo.
+echo   The read-only ~/.claude mount supplies OAuth creds at runtime --
+echo   nothing is baked into the image. (Base config also in mcp.json.example.)
+echo   On Windows, if your client does not expand ${HOME}, use the literal
+echo   path, e.g. "%%USERPROFILE%%\.claude:/home/advisor/.claude:ro".
+exit /b 0
+
+:: ── Option 1: Docker ─────────────────────────
+
+:dockerrun
+call :build
+if errorlevel 1 exit /b 1
+call :check_claude_auth
+call :prompt_openai
+call :print_snippet
 goto done
 
-:: ── Option 3: Docker MCP Toolkit ─────────────
+:: ── Option 2: Docker MCP Toolkit ─────────────
 
 :toolkit
 call :build
 if errorlevel 1 exit /b 1
+call :check_claude_auth
 
 echo.
 docker mcp version >nul 2>>"%ERROR_LOG%"
@@ -143,17 +132,10 @@ echo   * Registered in MCP Toolkit (tools visible via gateway)
 echo.
 echo   Note: Custom catalog servers don't yet appear in the Desktop UI.
 echo   Tools are routed through the gateway to connected clients.
-echo.
-echo   Add API keys to your MCP client config (mcp.json):
-echo.
-echo     "frontier-advisor": {
-echo       "command": "docker",
-echo       "args": [
-echo         "run", "-i", "--rm",
-echo         "-e", "ANTHROPIC_API_KEY=^<your-key-here^>",
-echo         "mcp/frontier-advisor"
-echo       ]
-echo     }
+
+call :prompt_openai
+call :print_snippet
+
 echo.
 echo   Then connect a client:
 echo     docker mcp client connect claude

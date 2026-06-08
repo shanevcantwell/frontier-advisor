@@ -45,9 +45,25 @@ Parameters: `question` (required), `context` (optional), `system_prompt` (option
 
 | Tier | Requirement |
 |---|---|
-| `claude_cli` (top) | The `claude` CLI on PATH, authenticated via OAuth. No API key. |
-| `openai` (fallback) | `OPENAI_API_KEY` set in the environment. |
+| `claude_cli` (top) | The `claude` CLI on PATH (npm `@anthropic-ai/claude-code`), authenticated via OAuth. No API key. |
+| `openai` (fallback) | `OPENAI_API_KEY` set in the environment (optional — only for the fallback tier). |
 | — | `OPENAI_BASE_URL` (optional) — default `https://api.openai.com`, override for proxies. |
+
+### Docker: no baked secrets, creds mounted at runtime
+
+The image bundles only the `claude` CLI binary — no API key or OAuth credential is baked
+into any layer. At runtime the host's OAuth creds are supplied via a read-only mount of
+`~/.claude` into the container (the CLI reads `$HOME/.claude/.credentials.json`):
+
+```bash
+docker run -i --rm \
+  -v "$HOME/.claude:/home/advisor/.claude:ro" \
+  mcp/frontier-advisor
+```
+
+Authenticate the `claude` CLI once on the host first (run `claude`, sign in via OAuth). Add
+`-e OPENAI_API_KEY=...` to enable the optional fallback. See [mcp/README.md](mcp/README.md)
+for the full install flow.
 
 ---
 

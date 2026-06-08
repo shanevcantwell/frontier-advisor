@@ -3,7 +3,7 @@ registry:
         command:
             - --transport=stdio
         dateAdded: "2026-03-04T00:00:00Z"
-        description: Gives local models a tool for consulting frontier AI (Anthropic, OpenAI) with provider fallback.
+        description: Gives local models a tool for consulting frontier AI. Top tier is the local `claude` CLI (Opus via OAuth); OpenAI GPT-4.1 is an availability fallback.
         image: mcp/frontier-advisor:latest
         metadata:
             category: ai
@@ -16,12 +16,14 @@ registry:
                 - advisory
         prompts: 0
         resources: {}
+        # Top tier (claude CLI) uses OAuth creds mounted read-only at runtime --
+        # the host's ~/.claude is mounted into /home/advisor/.claude:ro. No API
+        # key is baked or passed for the Anthropic tier. The only secret is the
+        # OPTIONAL OpenAI fallback key.
+        volumes:
+            - "{{HOME}}/.claude:/home/advisor/.claude:ro"
         secrets:
-            - description: "Anthropic API key for Claude models. Get one at https://console.anthropic.com/"
-              env: ANTHROPIC_API_KEY
-              example: sk-ant-api03-...
-              name: frontier-advisor.anthropic_api_key
-            - description: "OpenAI API key for GPT models. Get one at https://platform.openai.com/"
+            - description: "OPTIONAL OpenAI API key for the GPT-4.1 fallback tier. Get one at https://platform.openai.com/"
               env: OPENAI_API_KEY
               example: sk-proj-...
               name: frontier-advisor.openai_api_key

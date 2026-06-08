@@ -24,98 +24,83 @@ banner() {
 }
 
 menu() {
-  echo -e "  ${cyan}1)${reset}  Docker + mcp-vault     ${dim}(OS keychain, recommended)${reset}"
-  echo -e "  ${cyan}2)${reset}  Docker + env vars      ${dim}(quick start)${reset}"
-  echo -e "  ${cyan}3)${reset}  Docker MCP Toolkit     ${dim}(gateway + mcp.json)${reset}"
+  echo -e "  ${cyan}1)${reset}  Docker                 ${dim}(claude CLI / OAuth, recommended)${reset}"
+  echo -e "  ${cyan}2)${reset}  Docker MCP Toolkit     ${dim}(gateway + mcp.json)${reset}"
   echo ""
-  echo -ne "  ${bold}Pick an option [1/2/3]:${reset} "
+  echo -ne "  ${bold}Pick an option [1/2]:${reset} "
 }
 
 build_image() {
   echo ""
-  echo -e "  ${dim}Building Docker image...${reset}"
+  echo -e "  ${dim}Building Docker image (bundles the claude CLI)...${reset}"
   docker build -t "$IMAGE_NAME" "$REPO_DIR" --quiet > /dev/null
   echo -e "  ${green}✓${reset} Image built: ${bold}${IMAGE_NAME}${reset}"
 }
 
-# ── Option 1: Docker + mcp-vault ─────────────
+# ── Shared: claude CLI OAuth prerequisite ────
 
-install_vault() {
-  build_image
-
+check_claude_auth() {
   echo ""
-  if ! command -v mcp-vault > /dev/null 2>&1; then
-    echo -e "  ${yellow}!${reset} mcp-vault not found on PATH."
-    echo -e "    Install it from: ${dim}https://github.com/Shane/mcp-vault${reset}"
-    echo ""
+  echo -e "  ${bold}Top tier: local ${cyan}claude${reset}${bold} CLI (Opus via OAuth / flat-rate Claude Max)${reset}"
+  echo ""
+  if [ -f "$HOME/.claude/.credentials.json" ]; then
+    echo -e "  ${green}✓${reset} Found OAuth credentials at ${dim}~/.claude/.credentials.json${reset}"
+  else
+    echo -e "  ${yellow}!${reset} No ~/.claude/.credentials.json found."
+    echo -e "    Authenticate the CLI once on the host, then re-run if needed:"
+    echo -e "      ${dim}claude${reset}   ${dim}# sign in via OAuth, then exit${reset}"
+    echo -e "    The container mounts ~/.claude read-only — no API key is baked or needed."
   fi
+}
 
-  echo -e "  ${bold}Store your API keys (at least one):${reset}"
+prompt_openai_optional() {
   echo ""
-
-  echo -ne "  Anthropic API key (Enter to skip): "
-  read -rs anthropic_key
-  echo ""
-  if [ -n "$anthropic_key" ]; then
-    echo "$anthropic_key" | mcp-vault store anthropic/api-key 2>/dev/null \
-      && echo -e "  ${green}✓${reset} Stored anthropic/api-key" \
-      || echo -e "  ${yellow}!${reset} Could not store — run ${dim}mcp-vault store anthropic/api-key${reset} manually"
-  fi
-
-  echo -ne "  OpenAI API key (Enter to skip): "
+  echo -e "  ${bold}Optional: OpenAI fallback tier (GPT-4.1)${reset}"
+  echo -e "  ${dim}Used only when the claude CLI tier is unavailable. Press Enter to skip.${reset}"
+  echo -ne "  OPENAI_API_KEY (Enter to skip): "
   read -rs openai_key
   echo ""
   if [ -n "$openai_key" ]; then
-    echo "$openai_key" | mcp-vault store openai/api-key 2>/dev/null \
-      && echo -e "  ${green}✓${reset} Stored openai/api-key" \
-      || echo -e "  ${yellow}!${reset} Could not store — run ${dim}mcp-vault store openai/api-key${reset} manually"
+    OPENAI_LINE=$'\n        "-e", "OPENAI_API_KEY='"$openai_key"$'",'
+    echo -e "  ${green}✓${reset} OpenAI fallback enabled (key will be inlined in the snippet below)"
+    echo -e "  ${dim}Prefer not to inline it? Use mcp-vault: \"OPENAI_API_KEY=vault:openai/api-key\".${reset}"
+  else
+    OPENAI_LINE=""
+    echo -e "  ${dim}Skipped — top tier (claude CLI) only.${reset}"
   fi
+}
 
+print_config_snippet() {
   echo ""
   echo -e "  ${bold}Add this to your MCP client config (mcp.json):${reset}"
   echo ""
-  cat <<'SNIPPET'
-    "frontier-advisor": {
-      "command": "mcp-vault",
-      "args": [
-        "--", "docker", "run", "-i", "--rm",
-        "-e", "ANTHROPIC_API_KEY=vault:anthropic/api-key",
-        "-e", "OPENAI_API_KEY=vault:openai/api-key",
-        "mcp/frontier-advisor"
-      ]
-    }
-SNIPPET
+  echo '    "frontier-advisor": {'
+  echo '      "command": "docker",'
+  echo '      "args": ['
+  echo '        "run", "-i", "--rm",'
+  echo '        "-v", "${HOME}/.claude:/home/advisor/.claude:ro",'"$OPENAI_LINE"
+  echo '        "mcp/frontier-advisor"'
+  echo '      ]'
+  echo '    }'
   echo ""
-  echo -e "  ${dim}(also saved in mcp.json.example)${reset}"
+  echo -e "  ${dim}The read-only ~/.claude mount supplies OAuth creds at runtime —${reset}"
+  echo -e "  ${dim}nothing is baked into the image. (Base config also in mcp.json.example.)${reset}"
 }
 
-# ── Option 2: Docker + env vars ──────────────
+# ── Option 1: Docker ─────────────────────────
 
-install_env() {
+install_docker() {
   build_image
-
-  echo ""
-  echo -e "  ${yellow}!${reset} Keys in mcp.json are easily leaked when sharing config."
-  echo -e "    Consider ${bold}mcp-vault${reset} (option 2) to keep them in your OS keychain."
-  echo ""
-  echo -e "  ${bold}Add this to your MCP client config (mcp.json):${reset}"
-  echo ""
-  cat <<'SNIPPET'
-    "frontier-advisor": {
-      "command": "docker",
-      "args": [
-        "run", "-i", "--rm",
-        "-e", "ANTHROPIC_API_KEY=<your-key-here>",
-        "mcp/frontier-advisor"
-      ]
-    }
-SNIPPET
+  check_claude_auth
+  prompt_openai_optional
+  print_config_snippet
 }
 
-# ── Option 3: Docker MCP Toolkit ──────────────
+# ── Option 2: Docker MCP Toolkit ─────────────
 
 install_toolkit() {
   build_image
+  check_claude_auth
 
   echo ""
   if ! docker mcp version > /dev/null 2>&1; then
@@ -136,19 +121,10 @@ install_toolkit() {
   echo ""
   echo -e "  ${dim}Note: Custom catalog servers don't yet appear in the Desktop UI.${reset}"
   echo -e "  ${dim}Tools are routed through the gateway to connected clients.${reset}"
-  echo ""
-  echo -e "  ${bold}Add API keys to your MCP client config (mcp.json):${reset}"
-  echo ""
-  cat <<'SNIPPET'
-    "frontier-advisor": {
-      "command": "docker",
-      "args": [
-        "run", "-i", "--rm",
-        "-e", "ANTHROPIC_API_KEY=<your-key-here>",
-        "mcp/frontier-advisor"
-      ]
-    }
-SNIPPET
+
+  prompt_openai_optional
+  print_config_snippet
+
   echo ""
   echo -e "  ${bold}Then connect a client:${reset}"
   echo -e "    ${dim}docker mcp client connect claude${reset}"
@@ -162,9 +138,8 @@ menu
 read -r choice
 
 case "$choice" in
-  1) install_vault ;;
-  2) install_env ;;
-  3) install_toolkit ;;
+  1) install_docker ;;
+  2) install_toolkit ;;
   *)
     echo -e "\n  ${yellow}!${reset} Invalid choice. Run this script again."
     exit 1
