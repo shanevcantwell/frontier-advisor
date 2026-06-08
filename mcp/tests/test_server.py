@@ -59,8 +59,8 @@ class TestHandleConsult:
         """Test successful consult returns properly formatted response."""
         mock_result = {
             "response": "This is the advisory response.",
-            "provider": "anthropic",
-            "model": "claude-opus-4-7",
+            "provider": "claude_cli",
+            "model": "opus",
             "input_tokens": 50,
             "output_tokens": 25,
             "latency_ms": 1234,
@@ -90,8 +90,8 @@ class TestHandleConsult:
 
             # Verify all metadata fields
             metadata = data["metadata"]
-            assert metadata["provider"] == "anthropic"
-            assert metadata["model"] == "claude-opus-4-7"
+            assert metadata["provider"] == "claude_cli"
+            assert metadata["model"] == "opus"
             assert metadata["input_tokens"] == 50
             assert metadata["output_tokens"] == 25
             assert metadata["latency_ms"] == 1234
@@ -126,8 +126,8 @@ class TestHandleConsult:
         """Test that empty system_prompt is treated as None (uses default)."""
         mock_result = {
             "response": "Response.",
-            "provider": "anthropic",
-            "model": "claude-opus-4-7",
+            "provider": "claude_cli",
+            "model": "opus",
             "input_tokens": 10,
             "output_tokens": 5,
             "latency_ms": 500,
@@ -150,8 +150,8 @@ class TestHandleConsult:
         """Test consult with empty context."""
         mock_result = {
             "response": "Response.",
-            "provider": "anthropic",
-            "model": "claude-opus-4-7",
+            "provider": "claude_cli",
+            "model": "opus",
             "input_tokens": 10,
             "output_tokens": 5,
             "latency_ms": 500,
@@ -191,8 +191,8 @@ class TestHandleConsult:
         """Test that missing question defaults to empty string."""
         mock_result = {
             "response": "Response.",
-            "provider": "anthropic",
-            "model": "claude-opus-4-7",
+            "provider": "claude_cli",
+            "model": "opus",
             "input_tokens": 10,
             "output_tokens": 5,
             "latency_ms": 500,
@@ -215,8 +215,8 @@ class TestCallToolConsultAdvisor:
         """Test full call_tool path for consult_advisor."""
         mock_result = {
             "response": "Advisory response.",
-            "provider": "anthropic",
-            "model": "claude-opus-4-7",
+            "provider": "claude_cli",
+            "model": "opus",
             "input_tokens": 20,
             "output_tokens": 10,
             "latency_ms": 800,

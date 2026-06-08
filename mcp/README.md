@@ -8,9 +8,21 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for design rationale.
 
 | Tool | Purpose |
 |---|---|
-| `consult_advisor` | Ask a frontier model a question (Opus 4.7 primary, GPT-4.1 fallback) |
+| `consult_advisor` | Ask a frontier model a question (Claude/Opus via the local CLI primary, GPT-4.1 fallback) |
 
 Parameters: `question` (required), `context` (optional), `system_prompt` (optional override).
+
+## Advisory tiers
+
+Capability-ordered escalation, top tier first:
+
+1. **`claude_cli` (top tier)** — Claude/Opus reached through the local `claude` CLI
+   (OAuth / flat-rate Claude Max). It is invoked **leaf-only** — no tools, no MCP, a
+   single shot — so the advisor extracts model-grade intelligence from the agent
+   binary without granting it agency. **Requires the `claude` CLI on PATH,
+   authenticated via OAuth. No API key.**
+2. **`openai` (fallback tier)** — GPT-4.1 via the HTTP API. Used only when the CLI tier
+   is unavailable. Requires `OPENAI_API_KEY`.
 
 ## Quick Start
 
@@ -53,22 +65,23 @@ pip install -e .
 {
   "mcpServers": {
     "frontier-advisor": {
-      "command": "frontier-advisor",
-      "env": {
-        "ANTHROPIC_API_KEY": "sk-ant-..."
-      }
+      "command": "frontier-advisor"
     }
   }
 }
 ```
 
-## Environment Variables
+The top tier needs no `env` block — it uses the `claude` CLI on PATH (OAuth). Add
+`OPENAI_API_KEY` to `env` only if you want the OpenAI fallback tier.
+
+## Requirements & Environment Variables
+
+The top tier requires the **`claude` CLI on PATH, authenticated via OAuth** (run it once
+interactively to sign in). No API key is needed for the top tier.
 
 | Variable | Required | Default |
 |---|---|---|
-| `ANTHROPIC_API_KEY` | At least one provider | — |
-| `OPENAI_API_KEY` | At least one provider | — |
-| `ANTHROPIC_BASE_URL` | No | `https://api.anthropic.com` |
+| `OPENAI_API_KEY` | Only for the OpenAI fallback tier | — |
 | `OPENAI_BASE_URL` | No | `https://api.openai.com` |
 
 ## Development

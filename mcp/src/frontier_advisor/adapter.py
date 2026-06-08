@@ -1,19 +1,28 @@
-"""Frontier model adapter with provider fallback.
+"""Frontier model adapter with capability-ordered escalation.
 
-Credentials from environment variables:
-  ANTHROPIC_API_KEY  — Anthropic API key
-  OPENAI_API_KEY     — OpenAI API key
+The advisor is the intelligence-ceiling escalation primitive: a leaf dispatch
+that reaches a tier more capable than the caller. The top tier is the local
+``claude`` CLI (Opus via OAuth / flat-rate Claude Max) — invoked leaf-only (no
+tools, no MCP, single shot) so we extract model-grade intelligence from the
+agent binary without granting it agency. Below it, OpenAI via HTTP API is an
+availability fallback.
 
-Base URLs default to the public APIs. Override with:
-  ANTHROPIC_BASE_URL — default: https://api.anthropic.com
-  OPENAI_BASE_URL    — default: https://api.openai.com
+Top tier (claude_cli):
+  Requires the ``claude`` CLI on PATH, authenticated via OAuth. No API key.
 
-With mcp-vault, these become vault: references in mcp.json env block,
-resolved transparently at process spawn.
+Fallback tier (openai):
+  OPENAI_API_KEY    — OpenAI API key
+  OPENAI_BASE_URL   — default: https://api.openai.com (override for proxies)
+
+With mcp-vault, the OpenAI key becomes a vault: reference in the mcp.json env
+block, resolved transparently at process spawn.
 """
 
+import asyncio
+import json
 import logging
 import os
+import shutil
 import time
 
 import httpx
@@ -29,19 +38,22 @@ DEFAULT_SYSTEM_PROMPT = (
     "The local model is technically competent -- treat it as a peer."
 )
 
+# API-only output cap. Applies to the OpenAI HTTP tier; the claude CLI tier
+# does not take a max-tokens argument.
 MAX_TOKENS = 4096
 
+# Capability-ordered escalation, top tier first. The top tier is Claude/Opus
+# reached via the local `claude` CLI (OAuth / flat-rate); OpenAI/GPT-4.1 via
+# HTTP API is an availability fallback below it -- a lower tier, not a sibling.
 MODEL_PREFERENCE = [
-    ("anthropic", "claude-opus-4-7"),
+    ("claude_cli", "opus"),
     ("openai", "gpt-4.1"),
 ]
 
+# Timeout for the claude CLI subprocess. Cold start is ~12s; 180s absorbs it.
+CLAUDE_CLI_TIMEOUT = 180
+
 PROVIDER_CONFIG = {
-    "anthropic": {
-        "env_key": "ANTHROPIC_API_KEY",
-        "env_base_url": "ANTHROPIC_BASE_URL",
-        "default_base_url": "https://api.anthropic.com",
-    },
     "openai": {
         "env_key": "OPENAI_API_KEY",
         "env_base_url": "OPENAI_BASE_URL",
@@ -55,7 +67,16 @@ class FrontierAdapter:
         self._client = httpx.AsyncClient(timeout=120.0)
 
     def _get_provider_config(self, provider: str) -> dict | None:
-        """Read provider credentials from environment."""
+        """Resolve provider availability.
+
+        claude_cli is binary-presence based (no API key); openai is key-based.
+        """
+        if provider == "claude_cli":
+            binary = shutil.which("claude")
+            if not binary:
+                return None
+            return {"binary": binary}
+
         cfg = PROVIDER_CONFIG.get(provider)
         if not cfg:
             return None
@@ -75,9 +96,9 @@ class FrontierAdapter:
     ) -> dict:
         """Send question to frontier model with provider fallback.
 
-        Tries each model in preference order until one succeeds.
+        Tries each tier in escalation order until one succeeds.
         Returns dict with response, provider, model, token counts, latency.
-        Raises RuntimeError if all providers fail.
+        Raises RuntimeError if all tiers fail.
         """
         sys_prompt = system_prompt or DEFAULT_SYSTEM_PROMPT
         last_error = None
@@ -107,41 +128,88 @@ class FrontierAdapter:
 
         if last_error is not None:
             raise RuntimeError(f"All configured providers failed. Last error: {last_error}")
-        raise RuntimeError("No API key configured for any provider. Set ANTHROPIC_API_KEY and/or OPENAI_API_KEY in the environment.")
+        raise RuntimeError(
+            "No advisory tier available. The top tier is the local `claude` CLI "
+            "(OAuth / flat-rate) -- ensure `claude` is on PATH and authenticated. "
+            "For the OpenAI fallback tier, set OPENAI_API_KEY in the environment."
+        )
 
     async def _call(self, provider, model, q, ctx, max_tok, sys_prompt, creds):
-        if provider == "anthropic":
-            return await self._anthropic(model, q, ctx, max_tok, sys_prompt, creds)
+        if provider == "claude_cli":
+            return await self._claude_cli(model, q, ctx, max_tok, sys_prompt, creds)
         return await self._openai(model, q, ctx, max_tok, sys_prompt, creds)
 
-    async def _anthropic(self, model, q, ctx, max_tok, sys_prompt, creds):
-        headers = {
-            "x-api-key": creds["api_key"],
-            "anthropic-version": "2023-06-01",
-            "content-type": "application/json",
-        }
+    async def _claude_cli(self, model, q, ctx, max_tok, sys_prompt, creds):
         user_content = q
         if ctx:
             user_content = (
                 f"<advisory_context>\n{ctx}\n</advisory_context>\n\n"
                 f"<advisory_question>\n{q}\n</advisory_question>"
             )
-        body = {
-            "model": model,
-            "max_tokens": max_tok,
-            "system": sys_prompt,
-            "messages": [{"role": "user", "content": user_content}],
-        }
-        resp = await self._client.post(
-            f"{creds['base_url']}/v1/messages", headers=headers, json=body,
+
+        # Leaf-only invariant: the advisor invokes a more-capable agent and must
+        # keep it model-shaped -- no tools, no MCP, no recursion. --disallowedTools
+        # "*" strips tools; --strict-mcp-config with NO --mcp-config gives zero MCP
+        # servers, so the spawned `claude` cannot re-enter frontier-advisor or load
+        # pi-subagents. (max_tok / MAX_TOKENS is API-only and does NOT apply here.)
+        args = [
+            creds["binary"],
+            "-p", user_content,
+            "--model", model,
+            "--output-format", "json",
+            "--system-prompt", sys_prompt,
+            "--disallowedTools", "*",
+            "--strict-mcp-config",
+        ]
+
+        proc = await asyncio.create_subprocess_exec(
+            *args,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
         )
-        resp.raise_for_status()
-        data = resp.json()
-        text = "".join(b["text"] for b in data["content"] if b["type"] == "text")
+        try:
+            stdout, stderr = await asyncio.wait_for(
+                proc.communicate(), timeout=CLAUDE_CLI_TIMEOUT
+            )
+        except asyncio.TimeoutError:
+            proc.kill()
+            await proc.wait()
+            raise RuntimeError(f"claude CLI timed out after {CLAUDE_CLI_TIMEOUT}s")
+
+        if proc.returncode != 0:
+            raise RuntimeError(
+                f"claude CLI exited with code {proc.returncode}: "
+                f"{stderr.decode(errors='replace').strip()}"
+            )
+
+        parsed = json.loads(stdout)
+        # --output-format json returns a JSON ARRAY of event objects; find the
+        # result event. Defensively handle a dict envelope (use it directly if it
+        # carries a "result" key).
+        if isinstance(parsed, dict):
+            result_event = parsed if "result" in parsed else None
+        else:
+            result_event = next(
+                (e for e in parsed
+                 if isinstance(e, dict) and e.get("type") == "result"),
+                None,
+            )
+
+        if result_event is None:
+            raise RuntimeError("claude CLI returned no result event")
+        if result_event.get("is_error"):
+            raise RuntimeError("claude CLI reported is_error in the result event")
+        if result_event.get("subtype") != "success":
+            raise RuntimeError(
+                f"claude CLI result subtype was {result_event.get('subtype')!r}, "
+                "expected 'success'"
+            )
+
+        usage = result_event.get("usage") or {}
         return {
-            "text": text,
-            "input_tokens": data["usage"]["input_tokens"],
-            "output_tokens": data["usage"]["output_tokens"],
+            "text": result_event["result"],
+            "input_tokens": usage.get("input_tokens", 0),
+            "output_tokens": usage.get("output_tokens", 0),
         }
 
     async def _openai(self, model, q, ctx, max_tok, sys_prompt, creds):
